@@ -1,4 +1,4 @@
-pyportaudio
+sounddevice
 numpy~=2.0.2
 librosa~=0.10.2.post1
 joblib~=1.4.2
