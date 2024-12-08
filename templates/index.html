@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Emotion and Genre Prediction</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f9;
+            color: #333;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 30px;
+            color: #333;
+        }
+
+        h2 {
+            color: #444;
+        }
+
+        .container {
+            width: 80%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            margin-top: 40px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+
+        button {
+            padding: 12px;
+            font-size: 16px;
+            background-color: #5c6bc0;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #3f4a9a;
+        }
+
+        #emotionResult, #genreResult {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #e1f5fe;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #0288d1;
+            text-align: center;
+        }
+
+        #recordingControls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #audioPlayer {
+            margin-top: 10px;
+            display: none;
+        }
+
+        /* Responsive design */
+        @media (max-width: 600px) {
+            .container {
+                width: 95%;
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            h2 {
+                font-size: 20px;
+            }
+
+            button {
+                padding: 10px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Emotion and Genre Detection</h1>
+
+    <div class="container">
+        <!-- Emotion Detection Section -->
+        <h2>Emotion Detection</h2>
+        <form id="emotionForm" enctype="multipart/form-data">
+            <input type="file" name="audio" accept="audio/*" required>
+            <button type="submit">Predict Emotion</button>
+        </form>
+
+        <!-- Recording Option for Emotion -->
+        <div id="recordingControls">
+            <button id="startRecording">Start Recording</button>
+            <button id="stopRecording" style="display:none;">Stop Recording</button>
+            <audio id="audioPlayer" controls style="display:none;"></audio>
+        </div>
+
+        <div id="emotionResult"></div>  <!-- Emotion result will be displayed here -->
+
+        <!-- Genre Detection Section -->
+        <h2>Genre Detection</h2>
+        <form id="genreForm" enctype="multipart/form-data">
+            <input type="file" name="audio" accept="audio/*" required>
+            <button type="submit">Predict Genre</button>
+        </form>
+        <div id="genreResult"></div>  <!-- Genre result will be displayed here -->
+    </div>
+
+    <script>
+        // Emotion detection form submission
+        document.getElementById('emotionForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/predict_emotion', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('emotionResult').innerHTML = 'Predicted Emotion: ' + data.emotion;
+            })
+            .catch(error => console.error('Error predicting emotion:', error));
+        });
+
+        // Genre detection form submission
+        document.getElementById('genreForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/predict_genre', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('genreResult').innerHTML = 'Predicted Genre: ' + data.genre;
+            })
+            .catch(error => console.error('Error predicting genre:', error));
+        });
+
+        // Recording Audio for Emotion Detection
+        let audioChunks = [];
+        let mediaRecorder;
+
+        // Start Recording Button
+        document.getElementById('startRecording').onclick = async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audioPlayer = document.getElementById('audioPlayer');
+                audioPlayer.src = audioUrl;
+                audioPlayer.style.display = 'block';
+
+                // Send the recorded audio to the backend for emotion prediction
+                let audioData = new FormData();
+                audioData.append('audio', audioBlob);
+                fetch('/predict_emotion', {
+                    method: 'POST',
+                    body: audioData,
+                })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('emotionResult').innerHTML = 'Predicted Emotion: ' + data.emotion;
+                })
+                .catch(error => {
+                    console.error("Error in prediction:", error);
+                    document.getElementById('emotionResult').innerHTML = "Error in prediction.";
+                });
+
+                audioChunks = [];
+            };
+
+            mediaRecorder.start();
+            document.getElementById('startRecording').style.display = 'none';
+            document.getElementById('stopRecording').style.display = 'inline';
+        };
+
+        // Stop Recording Button
+        document.getElementById('stopRecording').onclick = () => {
+            mediaRecorder.stop();
+            document.getElementById('stopRecording').style.display = 'none';
+            document.getElementById('startRecording').style.display = 'inline';
+        };
+    </script>
+</body>
+</html>
